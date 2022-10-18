@@ -81,8 +81,8 @@ def get_balancer_status(host, connection) -> dict:
   except paramiko.ssh_exception.NoValidConnectionsError:
     logging.error(f'Unable to connect to {host}')
     return
-  # stdin, stdout, stderr = connection.exec_command('show ltm pool members field-fmt')
-  stdin, stdout, stderr = connection.exec_command('cat f5-balancer-response.txt')
+  stdin, stdout, stderr = connection.exec_command('show ltm pool members field-fmt raw')
+  # stdin, stdout, stderr = connection.exec_command('cat f5-balancer-response.txt')
   data = stdout.read() + stderr.read()
   data_json = prepare_json(data)
   data_json = parse_numbers_in_json(data_json)
@@ -134,7 +134,7 @@ def process_request(t) -> None:
 
 if __name__ == '__main__':
   # Start up the server to expose the metrics.
-  start_http_server(settings.EXPORTER_PORT)
+  start_http_server(int(settings.EXPORTER_PORT))
   logging.info(f'Started f5-exporter on port {settings.EXPORTER_PORT}')
   # Generate some requests.
   while True:
