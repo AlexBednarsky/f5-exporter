@@ -1,16 +1,18 @@
 FROM python:slim-bullseye
 
+WORKDIR /srv/www
+
+COPY pyproject.toml poetry.lock ./
+
 RUN apt update && \
     apt upgrade -y && \
-    apt install -y curl && \
+    apt install -y curl gcc libffi-dev && \
     apt clean 
 
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/usr/local python3 - 
 
-WORKDIR /srv/www
+RUN poetry config virtualenvs.create false && poetry install 
 
 COPY . .
-
-RUN poetry config virtualenvs.create false && poetry install 
 
 CMD ["python", "app.py"]

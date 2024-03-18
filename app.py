@@ -31,7 +31,7 @@ node_bits_out_gauge = Gauge(
   settings.node_info_labels)
 node_balancing_state_gauge = Gauge(
   'f5_balancing_state', 
-  'Balancing state metric. 0 - Offline, 1 - User Disabled, 2 - Online', 
+  'Balancing state metric. 0 - Offline, 1 - StandBy, 2 - Online, 3 - Out Of Balance by monitor, 4 - Forced Down', 
   settings.node_info_labels)
 
 
@@ -99,12 +99,17 @@ def process_request(t) -> None:
         pool_members = balancer_status[pool]['members']
         for member in pool_members.keys():
           # print(pool + ' :: ' + member + ' :: ' + str(pool_members[member]['addr']))
-          if pool_members[member]['session-status'] == 'user-disabled':
-            node_state = float(enums.NodeBalancingState.USER_DISABLED)
-          elif pool_members[member]['session-status'] == 'enabled':
+          if pool_members[member]['status.status-reason'] == 'Pool member has been marked down by a monitor' and pool_members[member]['monitor-status'] == 'down':
+            node_state = float(enums.NodeBalancingState.OUT_OF_BALANCE)
+          elif 'No successful responses received before deadline' in pool_members[member]['status.status-reason'] and pool_members[member]['monitor-status'] == 'down':
+            node_state = float(enums.NodeBalancingState.OUT_OF_BALANCE)
+          elif pool_members[member]['session-status'] == 'user-disabled': 
+            if pool_members[member]['status.status-reason'] == 'Forced down':
+              node_state = float(enums.NodeBalancingState.FORCED_DOWN)
+            elif pool_members[member]['status.status-reason'] == 'Pool member is available, user disabled':
+              node_state = float(enums.NodeBalancingState.STAND_BY)
+          elif pool_members[member]['session-status'] == 'enabled' and pool_members[member]['status.status-reason'] == 'Pool member is available':
             node_state = float(enums.NodeBalancingState.ENABLED)
-          elif (pool_members[member]['status.status-reason'] == 'Pool member has been marked down by a monitor' and pool_members[member]['monitor-status'] == 'down'):
-            node_state = float(enums.NodeBalancingState.OUTOFBALANCE)
           else:
             node_state = float(enums.NodeBalancingState.OFFLINE)
           node_current_connections_gauge.labels(
