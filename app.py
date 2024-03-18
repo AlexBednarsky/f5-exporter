@@ -103,6 +103,8 @@ def process_request(t) -> None:
             node_state = float(enums.NodeBalancingState.USER_DISABLED)
           elif pool_members[member]['session-status'] == 'enabled':
             node_state = float(enums.NodeBalancingState.ENABLED)
+          elif (pool_members[member]['status.status-reason'] == 'Pool member has been marked down by a monitor' and pool_members[member]['monitor-status'] == 'down'):
+            node_state = float(enums.NodeBalancingState.OUTOFBALANCE)
           else:
             node_state = float(enums.NodeBalancingState.OFFLINE)
           node_current_connections_gauge.labels(
