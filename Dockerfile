@@ -13,6 +13,10 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/usr/local python3
 
 RUN poetry config virtualenvs.create false && poetry install 
 
+COPY pyproject.toml .
+
+RUN poetry config virtualenvs.create false && poetry install 
+
 COPY . .
 
 CMD ["python", "app.py"]

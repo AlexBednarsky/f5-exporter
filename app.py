@@ -34,9 +34,7 @@ node_balancing_state_gauge = Gauge(
   'Balancing state metric. 0 - Offline, 1 - StandBy, 2 - Online, 3 - Out Of Balance by monitor, 4 - Forced Down', 
   settings.node_info_labels)
 
-
-
-def prepare_json(data) -> str:
+def prepare_json(data: str) -> str:
   data = data.decode('utf-8')
   data = re.sub(r'ltm pool ([\d\w\-_:.]+)\s{', '\"POOL-\\1\": {', data)
   data = re.sub(r'ltm node ([\d\w\-_:.]+)\s{', '\"\\1\": {', data)
@@ -47,23 +45,6 @@ def prepare_json(data) -> str:
   data = re.sub(r'}\s+\"', '},\n   \"', data)
   data = re.sub(r'\%\d{3}', '', data)
   data = re.sub(r'^([\w\W\s\S\d\D]+)$', '{\\1}', data)
-  return data
-
-def replace_quantifier(match) -> str:
-  # print(match.group(2))
-  if match.group(2) == "K":
-    quantifier = 1000
-  if match.group(2) == "M":
-    quantifier = 1000000
-  if match.group(2) == "G":
-    quantifier = 1000000000
-  if match.group(2) == "T":
-    quantifier = 1000000000000
-  value = float(match.group(1))
-  return str(int(value * quantifier))
-
-def parse_numbers_in_json(data) -> str:
-  data = re.sub(r'(\d+\.\d)(K|M|G|T)', replace_quantifier, data)
   return data
 
 def get_balancer_status(host, connection) -> dict:
@@ -85,16 +66,15 @@ def get_balancer_status(host, connection) -> dict:
   # stdin, stdout, stderr = connection.exec_command('cat f5-balancer-response.txt')
   data = stdout.read() + stderr.read()
   data_json = prepare_json(data)
-  data_json = parse_numbers_in_json(data_json)
   connection.close()
   logging.debug(f'Connection with {host} successfully closed')
   return dict(json.loads(data_json))
 
-def process_request(t) -> None:
+def process_request(t: int) -> None:
     """A dummy function that takes some time."""
-    for balancer in settings.F5_HOST:
-      logging.debug(f'Iterating balancer list, current item {balancer}')
-      balancer_status = get_balancer_status(balancer, balancer_connection)
+    for balancer_host in settings.F5_HOST:
+      logging.debug(f'Iterating balancer list, current item {balancer_host}')
+      balancer_status = get_balancer_status(balancer_host, balancer_connection)
       for pool in balancer_status.keys():
         pool_members = balancer_status[pool]['members']
         for member in pool_members.keys():
@@ -113,26 +93,31 @@ def process_request(t) -> None:
           else:
             node_state = float(enums.NodeBalancingState.OFFLINE)
           node_current_connections_gauge.labels(
+            balancer = str(balancer_host),
             address = str(pool_members[member]['addr']), 
             node_name = str(pool_members[member]['node-name']),
             pool_name = str(pool_members[member]['pool-name'])
             ).set(float(pool_members[member]['serverside.cur-conns']))
           node_max_connections_gauge.labels(
+            balancer = str(balancer_host),
             address = str(pool_members[member]['addr']), 
             node_name = str(pool_members[member]['node-name']),
             pool_name = str(pool_members[member]['pool-name'])
             ).set(float(pool_members[member]['serverside.max-conns']))
           node_bits_in_gauge.labels(
+            balancer = str(balancer_host),
             address = str(pool_members[member]['addr']), 
             node_name = str(pool_members[member]['node-name']),
             pool_name = str(pool_members[member]['pool-name'])
             ).set(float(pool_members[member]['serverside.bits-in']))
           node_bits_out_gauge.labels(
+            balancer = str(balancer_host),
             address = str(pool_members[member]['addr']), 
             node_name = str(pool_members[member]['node-name']),
             pool_name = str(pool_members[member]['pool-name'])
             ).set(float(pool_members[member]['serverside.bits-out']))
           node_balancing_state_gauge.labels(
+            balancer = str(balancer_host),
             address = str(pool_members[member]['addr']), 
             node_name = str(pool_members[member]['node-name']),
             pool_name = str(pool_members[member]['pool-name'])
@@ -145,4 +130,4 @@ if __name__ == '__main__':
   logging.info(f'Started f5-exporter on port {settings.EXPORTER_PORT}')
   # Generate some requests.
   while True:
-    process_request(settings.F5_REQUEST_INTERVAL)
+    process_request(int(settings.F5_REQUEST_INTERVAL))
